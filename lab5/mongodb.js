@@ -38,11 +38,12 @@ var Event = mongoose.model('Event', EventSchema);
 
 // Handling Requests - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+// Homepage
 app.get('/',function(req,res){
     res.send('Hello!');
 })
 
-// 
+//  Handle getting a specific eventId
 app.get('/event/:eventId',function(req,res) {
     Event.findOne( 
         {eventId: req.params.eventId},'eventId name loc quota',
@@ -70,7 +71,7 @@ app.get('/event/:eventId',function(req,res) {
 })
 
 
-// need to build restful API to handle all things
+// Handle form submission gotten from event_form.html - - - - - - - - - - - - - - - - - -
 app.post('/event', function(req,res){
     // Event -> eventId(number),name(string),loc(obj type),quota(number)
     // Find whether there are any events, if no events-> eventid = 0 , or else eventid = max+1
@@ -151,10 +152,10 @@ app.delete('/event/:eventId', function(req,res){
         
         if(err)
             return res.status(500).send(err);
-        console.log(deleted);
+        
         
         if(!deleted)
-            res.status(500).send("Event not found");
+            res.status(500).send("Unable to delete :event not found");
         // deleted contains the data
 
         else
@@ -211,17 +212,19 @@ app.get('/loc', function(req,res) {
         {    
         Location.find({})
         .exec(function(err,locations){
-            if(!locations)
-                res.send("You Have Not allocated any event");
-            var buffer = ""; // Empty string
+            if(locations.length<1)
+                res.send("No location found in the database");
+            else 
+            {var buffer = ""; // Empty string
             for(let location of locations){
                 buffer = buffer +
                 "Location ID: " + location.locId + "<br>\n" +
                 "Location Name: "+ location.name +"<br>\n" +
                 "Location Quota: "+ location.quota + "<br>\n"+
                 "---------------------------------------" + "<br>\n";
-            }
-        res.send(buffer);
+            }//end of for loop
+            res.send(buffer);
+        }//end of else
     });
         }       // end of if condition on 0 query
 
@@ -265,7 +268,7 @@ app.get('/loc/:locId', function(req,res){
     .findOne({locId: req.params.locId})
     .exec(function(err , location) {
         if(!location)
-            res.send('location with such id does not exist');
+            res.send('Location with such id does not exist');
         else {
             // Show details of the location 
             res.send("Location Found! Detail: <br>\n" +
@@ -280,37 +283,43 @@ app.get('/loc/:locId', function(req,res){
 
 // GET http://server address/event/event ID/loc/location ID Handler - - - - - - - - - - - -
 
-
+// Show all events that has this event ID or held at this location ID
 app.get('/event/:eventId/loc/:locId', function(req,res){
-    // Search an event of eventid at location locid
-
-    // First search the event , then location
+    // Get all events, it will return array of 
     Event
-    .findOne({eventId : req.params.eventId})
+    .find({})
     .populate('loc')
-    .exec(function(err, event) {
-        // if event not found immediately send response
-        if(!event) 
-            res.send('Event not Found');
-        else {
-            // if event found, then check if location matches 
-            if(event.loc.locId != req.params.locId) // location doesnt match
-                res.send("There is no such event that has this location ID");
-            // else: it matches
-            else {
-                // Show the detail of event:
-                res.send("Event Found! Detail: <br>\n"+
-                    "Event ID: " + event.eventId + "<br>\n" +
-                    "Event Name: " + event.name + "<br>\n" + 
-                    "Location ID: " + event.loc.locId + "<br>\n"+ 
-                    "Location Name: "+ event.loc.name + "<br>\n"+ 
-                    "Event Quota: "+ event.loc.quota + "<br>\n"
-                ); // end res.send
+    .exec( function(err, events){
+        if(events.length<1) // if array is empty
+            res.send("No events stored in database");
+        else{
+            // iterate through all events, store if eventId or locId mathces
+            var buffer = "" // empty string
+            
+            for(let event of events){
+               if(event.eventId == req.params['eventId'] || event.loc.locId ==req.params['locId']){
+                    buffer = buffer +
+                    "Event ID: "+ event.eventId + "<br>\n"+
+                    "Event Name: "+ event.name + "<br>\n" + 
+                    "Location ID: "+ event.loc.locId + "<br>\n"+
+                    "Location Name: "+ event.loc.name + "<br>\n" +
+                    "Event Quota: "+ event.quota + "<br>\n" +
+                    "-----------------------------------------<br>\n";
+               } //end of if
+                // Handle if such event specified doesn't exist
                 
-            }
 
-        }// end else    
-    });
+            } // end of for loop
+            if(buffer == ""){
+                res.send("Event with either specified eventId: "+req.params['eventId'] +" and locId: "+req.params['locId'] +" does not exist");
+                return;
+            }
+            res.send(buffer);
+        }
+        
+    });// end fo exec
+
+    
 
 }); // end handler
 
@@ -328,7 +337,7 @@ app.post('/loc', function(req,res) {
                 array.push(num.locId);
             }
             id = Math.max.apply(null,array) + 1; // finding maximum locId
-            
+        }   //end else
             // Now we create a new location document getting input from form
             var location = new Location({
                 locId: id,
@@ -345,7 +354,7 @@ app.post('/loc', function(req,res) {
                 );
 
             });
-        }
+        
     })
 
 }); // end of handler
